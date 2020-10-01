@@ -69,29 +69,32 @@ function getDataWithTimestamps(
   data: admin.firestore.DocumentData,
   firestoreStatics: typeof admin.firestore,
 ): Record<string, any> {
+  const isFirestoreDocument = (data: admin.firestore.DocumentData) =>
+    typeof data === 'object' &&
+    data !== null &&
+    !Array.isArray(data) &&
+    /* eslint-disable-next-line no-underscore-dangle */
+    !data._methodName &&
+    !data.seconds;
+
   // Exit if no statics are passed
   if (!firestoreStatics) {
     return data;
   }
   return Object.entries(data).reduce((acc, [currKey, currData]) => {
     // Convert nested timestamp if item is an object
-    if (
-      typeof currData === 'object' &&
-      currData !== null &&
-      !Array.isArray(currData) &&
-      /* eslint-disable-next-line no-underscore-dangle */
-      !currData._methodName &&
-      !currData.seconds
-    ) {
+    if (isFirestoreDocument(currData)) {
       return {
         ...acc,
         [currKey]: getDataWithTimestamps(currData, firestoreStatics),
       };
     }
     const value = Array.isArray(currData)
-      ? currData.map((dataItem) =>
-          convertValueToTimestampIfPossible(dataItem, firestoreStatics),
-        )
+      ? currData.map((dataItem) => {
+          if (isFirestoreDocument(dataItem))
+            return getDataWithTimestamps(dataItem, firestoreStatics);
+          return convertValueToTimestampIfPossible(dataItem, firestoreStatics);
+        })
       : convertValueToTimestampIfPossible(currData, firestoreStatics);
 
     return {
